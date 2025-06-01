@@ -1,4 +1,3 @@
-````markdown
 # LinkedIn Content-Hub 🛰️  
 *Produção automatizada de artigos e posts educativos sobre Estatística, Machine Learning e IA.*
 
@@ -208,5 +207,3 @@ Rodados automaticamente no CI. Cobertura mínima exigida: **80 %**.
 ## Licença
 
 [MIT](LICENSE) © 2025 Seu Nome / Sua Empresa
-
-```
