@@ -157,6 +157,8 @@ Arquivo-exemplo: `.github/workflows/main.yml`.
 
 ## Como Usar
 
+1. Configurar CLI do Google.
+
 ### Planejar (Planner)
 
 ```bash
