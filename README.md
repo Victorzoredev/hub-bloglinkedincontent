@@ -1,211 +1,197 @@
-# LinkedIn Content-Hub 🛰️  
-*Produção automatizada de artigos e posts educativos sobre Estatística, Machine Learning e IA.*
+# Hub-BlogLinkedinContent 🛰️
 
-![CI](https://img.shields.io/github/actions/workflow/status/SEU_USUARIO/NOME_DO_REPO/main.yml?branch=main)
-![License](https://img.shields.io/github/license/SEU_USUARIO/NOME_DO_REPO)
+*Automação de criação, revisão e publicação de artigos e posts educativos sobre Estatística, Machine Learning e IA.*
+
+![CI](https://img.shields.io/github/actions/workflow/status/SEU_USUARIO/hub-linkedincontent/ci.yml?branch=main)
+![License](https://img.shields.io/github/license/SEU_USUARIO/hub-linkedincontent)
 
 ---
 
 ## 📑 Índice
-1. [Visão Geral](#visão-geral)  
-2. [Arquitetura](#arquitetura)  
-3. [Stack Tecnológico](#stack-tecnológico)  
-4. [Estrutura do Repositório](#estrutura-do-repositório)  
-5. [Pré-requisitos](#pré-requisitos)  
-6. [Ambiente Local](#ambiente-local)  
-7. [Infra-as-Code & GCP](#infra-as-code--gcp)  
-8. [CI/CD](#cicd)  
-9. [Como Usar](#como-usar)  
-10. [Testes](#testes)  
-11. [Roadmap](#roadmap)  
-12. [Contribuição](#contribuição)  
-13. [Licença](#licença)
+
+1. [Visão Geral](#visão-geral)
+2. [Arquitetura de Agentes](#arquitetura-de-agentes)
+3. [Estrutura do Repositório](#estrutura-do-repositório)
+4. [Pré-requisitos](#pré-requisitos)
+5. [Variáveis de Ambiente](#variáveis-de-ambiente)
+6. [Uso Local](#uso-local)
+7. [Deploy no Google Cloud Run](#deploy-no-google-cloud-run)
+8. [CI/CD](#cicd)
+9. [Roadmap](#roadmap)
+10. [Contribuição](#contribuição)
+11. [Licença](#licença)
 
 ---
 
 ## Visão Geral
-Este projeto orquestra **agentes autônomos**—Planner, Writer, Reviewer, Illustrator, QA e Scheduler—para gerar, revisar e publicar:
 
-* **1 artigo** principal e **5 posts** curtos por semana  
-* Conteúdo **educativo** (estatística, ML e IA)  
-* **Tons**: acessível, objetivo, sem informalidade excessiva  
+Este repositório orquestra **agentes autônomos** que usam Google Cloud Storage como repositório central:
 
-Localmente você codifica, versiona e testa; no **GCP** você escala em produção usando Cloud Run, Cloud Scheduler, Pub/Sub e Secret Manager.
+1. **head\_agent.py**: cria um JSON com temas e tópicos.
+2. **draft\_agent.py**: gera rascunho detalhado do artigo para blog.
+3. **design\_agent.py**: transforma o conteúdo em HTML.
+4. **post\_blog.py**: publica o HTML no Blogger.
+5. **post\_page\_linkedin.py**: publica texto + link do blog na página do LinkedIn.
+6. **post\_person\_linkedin.py**: publica texto + link do blog no feed pessoal.
+
+Todo input e output de cada passo é armazenado em um **bucket GCS** configurável.
 
 ---
 
-## Arquitetura
+## Arquitetura de Agentes
+
 ```mermaid
-graph TD
-    A(Planner) --> |temas| B(Writer)
-    B --> |draft| C(Reviewer)
-    C -- aprovado --> D(Illustrator)
-    D --> |assets| E(QA)
-    E --> |ok| F(Scheduler)
-    F --> |API| G(LinkedIn)
-    C -- rejeitado --> B
-    G --> |engagement| A
-````
+flowchart TD
+    HEAD[head_agent.py]
+    DRAFT[draft_agent.py]
+    DESIGN[design_agent.py]
+    BLOG[post_blog.py]
+    PAGE[post_page_linkedin.py]
+    PERSON[post_person_linkedin.py]
+    
+    HEAD --> DRAFT --> DESIGN --> BLOG --> PAGE --> PERSON
+```
 
-* **Persistência**: planning.json em Firestore ou Cloud Storage
-* **Mensageria**: Pub/Sub topics entre agentes
-* **Escalonamento**: Cloud Scheduler dispara pipelines semanais
-* **Observabilidade**: Cloud Logging + Error Reporting
-
----
-
-## Stack Tecnológico
-
-| Camada          | Tecnologia                               |
-| --------------- | ---------------------------------------- |
-| Linguagem       | Python 3.12                              |
-| LLMs            | OpenAI API, Vertex AI Palm2 / Gemini     |
-| Orquestração    | FastAPI + Pydantic (micro-services)      |
-| Containerização | Docker + Docker Compose                  |
-| CI/CD           | GitHub Actions → Cloud Build → Cloud Run |
-| IaC             | Terraform (módulos GCP)                  |
+| Agente / Script               | Descrição                                                                        |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| **head\_agent.py**            | Lê planning.json no bucket, gera JSON com `theme` e lista `topics`.              |
+| **draft\_agent.py**           | Recebe JSON de temas/tópicos e preenche `draft` com parágrafos para cada tópico. |
+| **design\_agent.py**          | Converte JSON + rascunho em HTML final para publicação.                          |
+| **post\_blog.py**             | Usa API do Blogger para publicar artigo a partir do HTML.                        |
+| **post\_page\_linkedin.py**   | Publica artigo longo (texto + link) na seção de artigos do LinkedIn.             |
+| **post\_person\_linkedin.py** | Publica post curto (texto + link) no feed pessoal do LinkedIn.                   |
 
 ---
 
 ## Estrutura do Repositório
 
-```
-.
-├── agents/              # Planner, Writer, ...
-├── config/              # config.yaml, secrets.toml.example
-├── data/                # planning.json (dev)
-├── docs/                # arquitetura, decisões ADR
-├── notebooks/           # experimentos (opcional)
-├── output/              # drafts & assets locais
-├── scripts/             # run_pipeline.py, helpers
-├── tests/               # pytest
-├── Dockerfile
-├── docker-compose.yml   # ambiente local completo
-├── requirements.txt
-└── .github/workflows/   # CI/CD
+```text
+hub-linkedincontent/
+├── .github/workflows/           # CI/CD GitHub Actions
+│   └── ci.yml
+├── acesso/                      # credenciais e tokens
+│   ├── blogger_token.json
+│   ├── blogger.json
+│   └── zore.json
+├── scripts/                     # código dos agentes e utilitários
+│   ├── head_agent.py
+│   ├── draft_agent.py
+│   ├── design_agent.py
+│   ├── post_blog.py
+│   ├── post_page_linkedin.py
+│   ├── post_person_linkedin.py
+│   └── utils.py
+├── get_token_blogger.py         # script para obtain/refrescar token Blogger
+├── .env.example                 # template de variáveis de ambiente
+├── Dockerfile                   # containerização
+├── README.md                    # este arquivo
+└── requirements.txt             # dependências Python
 ```
 
 ---
 
 ## Pré-requisitos
 
-* **Docker 20+** e **docker-compose v2**
-* **Python 3.12** se rodar sem Docker
-* Conta GCP com projeto e faturamento
-* Chaves de API OpenAI e Vertex AI
-* Terraform 1.8+ (para IaC)
-* [`gcloud`](https://cloud.google.com/sdk) CLI autenticado
+* **Python 3.12**
+* **Docker 20+** (opcional para ambiente local)
+* Conta GCP com bucket habilitado
+* `gcloud CLI` autenticado (`gcloud init`)
+* Chave de API OpenAI e OAuth Blogger
 
 ---
 
-## Ambiente Local
+## Variáveis de Ambiente
+
+Copie e ajuste:
 
 ```bash
-# 1. Clone
-git clone https://github.com/SEU_USUARIO/NOME_DO_REPO.git
-cd NOME_DO_REPO
-
-# 2. Variáveis-ambiente
-cp config/.env.example .env               # edite token OpenAI, etc.
-
-# 3. Suba tudo em Docker
-docker compose up --build
-
-# 4. Rode a pipeline manualmente
-docker compose exec api python scripts/run_pipeline.py
+cp .env.example .env
 ```
 
-> **Dica:** adicione `--agent writer` ou `--dry-run` para executar etapas específicas.
+| Variável             | Descrição                                |
+| -------------------- | ---------------------------------------- |
+| `OPENAI_API_KEY`     | Chave da API OpenAI                      |
+| `GCP_PROJECT_ID`     | ID do projeto no Google Cloud            |
+| `BUCKET_NAME`        | Nome do bucket GCS para leitura/escrita  |
+| `BLOGGER_TOKEN_PATH` | Caminho para `acesso/blogger_token.json` |
+| `BLOGGER_ID`         | ID do blog (em `acesso/blogger.json`)    |
 
 ---
 
-## Infra-as-Code & GCP
+## Uso Local
 
-### Provisionar com Terraform
+1. **Configure venv** e instale dependências:
+
+   ```bash
+   python -m venv .venv && source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+2. **Exemplo**: gerar rascunho e publicar um post curto:
+
+   ```bash
+   # Head: gera temas/tópicos
+   python scripts/head_agent.py
+
+   # Draft: gera conteúdo em 'draft'
+   python scripts/draft_agent.py
+
+   # Design: converte em HTML
+   python scripts/design_agent.py
+
+   # Publica no Blogger
+   python scripts/post_blog.py
+
+   # Publica no LinkedIn (artigo)
+   python scripts/post_page_linkedin.py
+
+   # Publica no LinkedIn (feed)
+   python scripts/post_person_linkedin.py
+   ```
+
+---
+
+## Deploy no Google Cloud Run
 
 ```bash
-cd infra/terraform
-terraform init
-terraform apply    # cria Cloud Run, Pub/Sub, Firestore, Secret Manager…
+# Build e push da imagem
+gcloud builds submit --tag gcr.io/$GCP_PROJECT_ID/content-hub:latest
+
+# Deploy
+gcloud run deploy content-hub \
+  --image gcr.io/$GCP_PROJECT_ID/content-hub:latest \
+  --region southamerica-east1 \
+  --set-env-vars OPENAI_API_KEY=$OPENAI_API_KEY,BUCKET_NAME=$BUCKET_NAME \
+  --allow-unauthenticated
 ```
 
-### Componentes Criados
-
-| Serviço         | Descrição                         |
-| --------------- | --------------------------------- |
-| Cloud Run       | micro-serviços dos agentes        |
-| Pub/Sub         | topics: `drafts`, `reviews`, …    |
-| Cloud Scheduler | cron semanal `0 9 * * MON`        |
-| Cloud Storage   | `gs://content-hub-assets`         |
-| Secret Manager  | openai\_api\_key, vertex\_sa\_key |
+**Obs.**: use Cloud Scheduler + Pub/Sub para acionar agents automaticamente.
 
 ---
 
 ## CI/CD
 
-1. **Push → GitHub Actions**
-
-   * Lint + Unit tests
-   * Build Docker image
-2. **Upload → Artifact Registry**
-3. **Deploy → Cloud Run** via Cloud Build
-4. **Tag semântica** (`v1.0.0`) cria release automática
-
-Arquivo-exemplo: `.github/workflows/main.yml`.
-
----
-
-## Como Usar
-
-1. Configurar CLI do Google.
-
-### Planejar (Planner)
-
-```bash
-curl -X POST http://localhost:8000/plan \
-     -d '{"week":"2025-W23"}'
-```
-
-### Executar Writer
-
-```bash
-curl -X POST http://localhost:8000/write \
-     -d '{"week":"2025-W23"}'
-```
-
-> **Produção**: endpoints expostos em Cloud Run; autentique com Identity-Aware Proxy ou Cloud Endpoints.
-
----
-
-## Testes
-
-```bash
-pytest -q
-```
-
-Rodados automaticamente no CI. Cobertura mínima exigida: **80 %**.
+* **Lint & Testes**: GitHub Actions executa lint e `pytest`.
+* **Build & Deploy**: Cloud Build constrói imagem e implanta no Cloud Run.
 
 ---
 
 ## Roadmap
 
-* [x] MVP local (pipeline síncrono)
-* [ ] Agentes assíncronos via Pub/Sub
-* [ ] Painel de métricas (Cloud Monitoring)
-* [ ] Multi-idioma (EN / PT)
-* [ ] Integração com Notion para planejamento
+* Integração com Pub/Sub para pipelines assíncronas
+* Dashboard de métricas de engajamento
+* Tradução automática (EN/PT)
 
 ---
 
 ## Contribuição
 
-1. Abra uma *issue* descrevendo mudança ou bug.
-2. Crie branch `feature/<descrição>` a partir de `develop`.
-3. Siga [Conventional Commits](https://www.conventionalcommits.org).
-4. Envie *pull request*; o template solicitará checklist de testes.
+1. Fork deste repositório.
+2. Crie branch `feat/<descrição>`.
+3. Abra PR, seguindo Conventional Commits.
+4. Cubra novo código com testes.
 
 ---
 
 ## Licença
 
-[MIT](LICENSE) © 2025 Seu Nome / Sua Empresa
+MIT © 2025 Victor Zoré
