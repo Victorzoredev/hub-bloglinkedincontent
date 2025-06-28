@@ -108,13 +108,18 @@ Copie e ajuste:
 cp .env.example .env
 ```
 
-| Variável             | Descrição                                |
-| -------------------- | ---------------------------------------- |
-| `OPENAI_API_KEY`     | Chave da API OpenAI                      |
-| `GCP_PROJECT_ID`     | ID do projeto no Google Cloud            |
-| `BUCKET_NAME`        | Nome do bucket GCS para leitura/escrita  |
-| `BLOGGER_TOKEN_PATH` | Caminho para `acesso/blogger_token.json` |
-| `BLOGGER_ID`         | ID do blog (em `acesso/blogger.json`)    |
+| Variável                     | Descrição                                |
+| --------------------         | ---------------------------------------- |
+| `OPENAI_API_KEY`             | Chave da API OpenAI                      |
+| `GCP_PROJECT`                | ID do projeto no Google Cloud            |
+| `BUCKET_NAME`                | Nome do bucket GCS para leitura/escrita  |
+| `BLOGGER_TOKEN_PATH`         | Token Blog                               |
+| `BLOGGER_ID`                 | ID do Blog                               |
+| `LINKEDIN_ACCESS_TOKEN`      | Access Token Linkedin                    |
+| `LINKEDIN_API_VERSION`       | 202503                                   |
+| `LINKEDIN_ORGANIZATION_URN`  | Organization URN (number)                |
+| `LINKEDIN_PERSON_URN`        | Person URN (letras)                      |
+| `LINKEDIN_REFRESH_TOKEN`     | Refresh Token (para atualizar token)     |
 
 ---
 
@@ -172,15 +177,6 @@ gcloud run deploy content-hub \
 
 * **Lint & Testes**: GitHub Actions executa lint e `pytest`.
 * **Build & Deploy**: Cloud Build constrói imagem e implanta no Cloud Run.
-
----
-
-## Roadmap
-
-* Integração com Pub/Sub para pipelines assíncronas
-* Dashboard de métricas de engajamento
-* Tradução automática (EN/PT)
-
 ---
 
 ## Contribuição
